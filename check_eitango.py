@@ -150,15 +150,17 @@ def get_alignment(word: str, xs: XSampa, use_flite: bool = False) -> list[dict]:
         # セグメントごとのX-SAMPAと特徴量ベクトル
         seg_info = []
         if ipa:
-            # IPAをセグメントに分割
-            segs = FT.ipa_segs(ipa)
-            if segs:
-                for seg in segs:
-                    seg_xsampa = xs.ipa2xs(seg)
-                    vec = FT.segment_to_vector(seg)
+            # word_ftsでSegmentオブジェクトを取得（.numeric()で数値ベクトル取得可能）
+            seg_objs = FT.word_fts(ipa)
+            ipa_segs = FT.ipa_segs(ipa)
+            if seg_objs and ipa_segs:
+                for seg_str, seg_obj in zip(ipa_segs, seg_objs):
+                    seg_xsampa = xs.ipa2xs(seg_str)
+                    # Segment.numeric()で数値形式のベクトルを取得
+                    vec = seg_obj.numeric()
                     seg_info.append(
                         {
-                            "ipa_segment": seg,
+                            "ipa_segment": seg_str,
                             "xsampa_segment": seg_xsampa,
                             "feature_vector": vec,
                         }
@@ -357,65 +359,75 @@ def print_raw_data(word: str, use_flite: bool = False) -> None:
         print(f"  [{i}] '{arpa}' → clean: '{arpa_clean}' → arpa_map: '{ipa}'")
 
 
-def print_arpabet_map(xs: XSampa) -> None:
+def analyze_diff(word: str, use_flite: bool = False) -> None:
     """
-    ARPABET→IPA→X-SAMPAのマッピング表を表示
-    epitranのFliteLexLookupが持つarpa_mapを使用
+    arpa_mapによる個別マッピングとarpa_to_ipaの差異を詳細分析
+    （check_kana.pyのanalyze_diffに相当）
     """
-    arpa_map = FLITE.arpa_map
+    print(f"\n【{word}】のマップ vs arpa_to_ipa分析")
+    print("=" * 70)
 
-    print("\nARPABET → IPA → X-SAMPA マッピング表")
-    print("(epitran FliteLexLookup.arpa_map より)")
-    print("=" * 60)
-    print(f"{'ARPABET':<10} {'IPA':<15} {'X-SAMPA':<15}")
-    print("-" * 60)
-
-    # 母音と子音に分類
-    vowels = []
-    consonants = []
-    others = []
-
-    vowel_arpabets = {
-        "aa",
-        "ae",
-        "ah",
-        "ao",
-        "aw",
-        "ax",
-        "ay",
-        "eh",
-        "er",
-        "ey",
-        "ih",
-        "iy",
-        "ow",
-        "oy",
-        "uh",
-        "uw",
-    }
-
-    for arpa, ipa in sorted(arpa_map.items()):
-        xsampa = xs.ipa2xs(ipa) if ipa else ""
-
-        entry = (arpa, ipa, xsampa)
-        if arpa in vowel_arpabets:
-            vowels.append(entry)
-        elif arpa in {"pau", "null"}:
-            others.append(entry)
+    # ARPABETを取得
+    if use_flite:
+        arpa_list = get_arpabet_from_flite(word)
+        source = "flite"
+    else:
+        result = get_arpabet_from_cmudict(word)
+        if result is not None:
+            arpa_list, _ = result
+            source = "cmudict"
         else:
-            consonants.append(entry)
+            arpa_list = get_arpabet_from_flite(word)
+            source = "flite" if arpa_list else None
 
-    print("\n【母音】")
-    for arpa, ipa, xsampa in vowels:
-        print(f"{arpa:<10} {ipa:<15} {xsampa:<15}")
+    if arpa_list is None:
+        print(f"エラー: '{word}'のARPABET取得に失敗")
+        return
 
-    print("\n【子音】")
-    for arpa, ipa, xsampa in consonants:
-        print(f"{arpa:<10} {ipa:<15} {xsampa:<15}")
+    # arpa_mapで個別に変換したIPAを連結
+    map_ipa_parts = []
+    for arpa in arpa_list:
+        arpa_clean = remove_stress(arpa).lower()
+        ipa = FLITE.arpa_map.get(arpa_clean, "")
+        map_ipa_parts.append(ipa)
+    map_ipa = "".join(map_ipa_parts)
 
-    print("\n【その他】")
-    for arpa, ipa, xsampa in others:
-        print(f"{arpa:<10} {ipa or '(空)':<15} {xsampa or '(空)':<15}")
+    # arpa_to_ipaで変換
+    arpa_list_for_epitran = (
+        "(" + " ".join([remove_stress(a).lower() for a in arpa_list]) + ")"
+    )
+    final_ipa = FLITE.arpa_to_ipa(arpa_list_for_epitran)
+
+    print(f"入力単語:            {word}")
+    print(f"データソース:        {source}")
+    print(f"ARPABET:             {' '.join(arpa_list)}")
+    print(f"マップ後IPA:         {map_ipa}")
+    print(f"最終IPA:             {final_ipa}")
+    print("-" * 70)
+
+    if map_ipa == final_ipa:
+        print("→ arpa_to_ipaによる変更なし")
+    else:
+        print("→ arpa_to_ipaによる変更あり")
+        print()
+        print("変更箇所の分析:")
+
+        # 変換パターンの検出
+        print("\n推定される変換パターン:")
+        detected_patterns = []
+
+        # 母音の長さなど
+        if len(map_ipa) != len(final_ipa):
+            detected_patterns.append(
+                f"文字数変化: {len(map_ipa)} → {len(final_ipa)}"
+            )
+
+        # 具体的な差異を表示
+        if not detected_patterns:
+            detected_patterns.append("（差異の詳細分析には追加実装が必要）")
+
+        for pattern in detected_patterns:
+            print(f"  - {pattern}")
 
 
 def main():
@@ -427,7 +439,7 @@ def main():
   uv run python check_eitango.py                          # デフォルトのサンプル単語
   uv run python check_eitango.py -w hello world           # 指定した単語を分析
   uv run python check_eitango.py -w beautiful --detail    # 詳細表示
-  uv run python check_eitango.py --arpabet-map            # ARPABETマッピング表を表示
+  uv run python check_eitango.py --diff                   # マップとarpa_to_ipaの差異分析
   uv run python check_eitango.py --raw                    # 生のARPABETデータを表示
   uv run python check_eitango.py --use-flite              # lex_lookupを使用（Fliteインストール必須）
         """,
@@ -448,9 +460,9 @@ def main():
     )
 
     parser.add_argument(
-        "--arpabet-map",
+        "--diff",
         action="store_true",
-        help="ARPABET→IPA→X-SAMPAのマッピング表を表示",
+        help="マップ結果とarpa_to_ipa適用後の差異を分析",
     )
 
     parser.add_argument(
@@ -487,15 +499,6 @@ def main():
     else:
         print("ARPABETソース: CMUdict")
 
-    # マッピング表の表示
-    if args.arpabet_map or args.all:
-        print_arpabet_map(xs)
-
-    # 単語の分析
-    if args.arpabet_map and not args.words and not args.all:
-        # マッピング表のみの表示の場合は単語分析をスキップ
-        return
-
     # デフォルトのサンプル単語
     default_words = [
         "hello",
@@ -515,10 +518,13 @@ def main():
             # すべてのモードを実行
             print_raw_data(word, args.use_flite)
             print_detail_alignment(word, xs, args.use_flite)
+            analyze_diff(word, args.use_flite)
         elif args.raw:
             print_raw_data(word, args.use_flite)
         elif args.detail:
             print_detail_alignment(word, xs, args.use_flite)
+        elif args.diff:
+            analyze_diff(word, args.use_flite)
         else:
             # デフォルト: 基本的な対応関係
             print_basic_alignment(word, xs, args.use_flite)
