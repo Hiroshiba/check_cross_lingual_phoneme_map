@@ -73,17 +73,22 @@ mora_mapping.pyとKanaのcsvファイルから、モーラを形成する音素�
 作るcsvは、ヴァ行の子音はIPA音声記号`v`系にしてください。つまり ヴァ,va ヴィ,vi ヴ,vɯ ヴェ,ve ヴォ,voで上書きしてください。
 保存先は hiho_data/openjtalk_to_ipa.csv としてください 
 
----
-
-以上がこれまでの経緯です。
-今回は以下のタスクを遂行してください。
-
 openjtalkのラベルからIPA音声記号・X-SAMPA・panphon特徴量への変換を実装していきましょう。
 とりあえずまずは日本語テキストを受け取って音素ラベル列にするコードを書いてください。
 続いて、作ったipaのcsvを使って、openjtalkのラベル列からIPA音声記号列に変換するコードを書いてください。
 `pau`ラベルが途中に来たときはそこで前後を分割し、分割した各部分を変換して、それぞれについて変換、表示してください。
 `check_epitran_openjtalk.py`というファイル名で作成してください。
 できる限りEpitranのコードを利用し、模倣実装は避けてください。
+
+---
+
+以上がこれまでの経緯です。
+今回は以下のタスクを遂行してください。
+
+望んだ後処理をするためのcsvファイルを作ってください。
+コードは`make_openjtalk_ipa_postprocess_map.py`というファイル名で作成してください。
+jpn-Kanaのpostprocess用csvを読み込んで、openjtalkラベル用に変えたcsvを作成してください。
+`hiho_data/openjtalk_postprocess.txt`に保存してください。
 `reports/2025-12-30 openjtalk音素ラベルからIPAへの変換.md`を読んで参考にしてください。
 
 まずは言われたところまででお願いします。
