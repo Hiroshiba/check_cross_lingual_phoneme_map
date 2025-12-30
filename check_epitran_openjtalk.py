@@ -24,7 +24,6 @@ import regex
 from epitran.rules import Rules
 from epitran.simple import SimpleEpitran
 
-
 # =============================================================================
 # OpenJTalk音素ラベル用Epitranクラス
 # =============================================================================
@@ -150,10 +149,7 @@ class _CustomProcessor:
 # デフォルトのファイルパス
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _MAP_FILE = os.path.join(_BASE_DIR, "hiho_data", "openjtalk_to_ipa.csv")
-_POST_FILE = os.path.join(
-    _BASE_DIR,
-    ".venv/lib/python3.13/site-packages/epitran/data/post/jpn-Kana.txt",
-)
+_POST_FILE = os.path.join(_BASE_DIR, "hiho_data", "openjtalk_postprocess.txt")
 
 # グローバルインスタンス（遅延初期化）
 _epitran_instance: OpenJTalkLabelEpitran | None = None
@@ -466,7 +462,7 @@ def main():
                 for i, segment in enumerate(segments):
                     labels_no_space = segment.replace(" ", "")
                     ipa = epi.transliterate(labels_no_space) if labels_no_space else ""
-                    print(f"セグメント{i+1}:")
+                    print(f"セグメント{i + 1}:")
                     print(f"  OpenJTalk: {segment}")
                     print(f"  IPA: {ipa}")
                 print("-" * 50)

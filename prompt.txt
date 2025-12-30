@@ -80,15 +80,18 @@ openjtalkのラベルからIPA音声記号・X-SAMPA・panphon特徴量への変
 `check_epitran_openjtalk.py`というファイル名で作成してください。
 できる限りEpitranのコードを利用し、模倣実装は避けてください。
 
+望んだ後処理をするためのcsvファイルを作ってください。
+コードは`make_openjtalk_ipa_postprocess_map.py`というファイル名で作成してください。
+jpn-Kanaのpostprocess用csvを読み込んで、openjtalkラベル用に変えたcsvを作成してください。
+`hiho_data/openjtalk_postprocess.txt`に保存してください。
+
 ---
 
 以上がこれまでの経緯です。
 今回は以下のタスクを遂行してください。
 
-望んだ後処理をするためのcsvファイルを作ってください。
-コードは`make_openjtalk_ipa_postprocess_map.py`というファイル名で作成してください。
-jpn-Kanaのpostprocess用csvを読み込んで、openjtalkラベル用に変えたcsvを作成してください。
-`hiho_data/openjtalk_postprocess.txt`に保存してください。
+`check_epitran_openjtalk.py`の機能を修正していきます。
+後処理に`hiho_data/openjtalk_postprocess.txt`を使うように修正してください。
 `reports/2025-12-30 openjtalk音素ラベルからIPAへの変換.md`を読んで参考にしてください。
 
 まずは言われたところまででお願いします。
