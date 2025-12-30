@@ -198,18 +198,58 @@ def phoneme_labels_to_ipa(phoneme_labels: str) -> str:
     """
     OpenJTalk音素ラベル列をIPA音声記号列に変換する
 
+    pauラベルがある場合は、pauで分割して各部分を変換し、
+    スペースで結合して返す。
+
     Args:
         phoneme_labels: スペース区切りの音素ラベル列
 
     Returns:
-        IPA音声記号列
+        IPA音声記号列（pauがあった場合はスペース区切り）
     """
-    # スペースを削除してモーラ単位の文字列にする
-    labels_no_space = phoneme_labels.replace(" ", "")
+    # pauで分割
+    segments = split_by_pau(phoneme_labels)
 
-    # Epitranで変換
+    # 各セグメントを変換
     epi = _get_epitran()
-    return epi.transliterate(labels_no_space)
+    ipa_segments = []
+    for segment in segments:
+        # スペースを削除してモーラ単位の文字列にする
+        labels_no_space = segment.replace(" ", "")
+        if labels_no_space:  # 空でない場合のみ変換
+            ipa = epi.transliterate(labels_no_space)
+            ipa_segments.append(ipa)
+
+    return " ".join(ipa_segments)
+
+
+def split_by_pau(phoneme_labels: str) -> list[str]:
+    """
+    音素ラベル列をpauで分割する
+
+    Args:
+        phoneme_labels: スペース区切りの音素ラベル列
+
+    Returns:
+        pauで分割されたセグメントのリスト
+    """
+    phonemes = phoneme_labels.split(" ")
+    segments = []
+    current_segment = []
+
+    for phoneme in phonemes:
+        if phoneme == "pau":
+            if current_segment:
+                segments.append(" ".join(current_segment))
+                current_segment = []
+        else:
+            current_segment.append(phoneme)
+
+    # 最後のセグメントを追加
+    if current_segment:
+        segments.append(" ".join(current_segment))
+
+    return segments
 
 
 def text_to_ipa(text: str) -> str:
@@ -413,10 +453,27 @@ def main():
             print(result)
         else:
             phonemes = text_to_phoneme_labels(args.text)
-            ipa = phoneme_labels_to_ipa(phonemes)
             print(f"テキスト: {args.text}")
             print(f"OpenJTalk: {phonemes}")
-            print(f"IPA: {ipa}")
+
+            # pauで分割して表示
+            segments = split_by_pau(phonemes)
+            if len(segments) > 1:
+                print()
+                print(f"pauで分割されたセグメント数: {len(segments)}")
+                print("-" * 50)
+                epi = _get_epitran()
+                for i, segment in enumerate(segments):
+                    labels_no_space = segment.replace(" ", "")
+                    ipa = epi.transliterate(labels_no_space) if labels_no_space else ""
+                    print(f"セグメント{i+1}:")
+                    print(f"  OpenJTalk: {segment}")
+                    print(f"  IPA: {ipa}")
+                print("-" * 50)
+                print(f"IPA (結合): {phoneme_labels_to_ipa(phonemes)}")
+            else:
+                ipa = phoneme_labels_to_ipa(phonemes)
+                print(f"IPA: {ipa}")
     else:
         if not args.examples and not args.debug:
             parser.print_help()
