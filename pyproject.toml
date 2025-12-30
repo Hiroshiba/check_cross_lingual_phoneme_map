@@ -8,6 +8,7 @@ dependencies = [
     "matplotlib>=3.10.8",
     "numpy>=2.4.0",
     "panphon>=0.22.2",
+    "pyopenjtalk>=0.4.1",
     "scipy>=1.16.3",
     "seaborn>=0.13.2",
 ]
