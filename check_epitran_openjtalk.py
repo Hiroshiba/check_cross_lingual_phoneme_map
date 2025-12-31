@@ -267,61 +267,6 @@ def text_to_ipa(text: str) -> str:
 # =============================================================================
 
 
-def analyze_text(text: str) -> None:
-    """
-    テキストの音素変換結果を詳細に分析して表示する
-
-    Args:
-        text: 日本語テキスト
-    """
-    print(f"入力テキスト: {text}")
-    print("-" * 50)
-
-    # 音素ラベル列を取得
-    phoneme_str = text_to_phoneme_labels(text)
-    phoneme_list = text_to_phoneme_list(text)
-
-    print(f"OpenJTalk音素: {phoneme_str}")
-    print(f"音素数: {len(phoneme_list)}")
-
-    # IPA変換
-    ipa = phoneme_labels_to_ipa(phoneme_str)
-    print(f"IPA: {ipa}")
-    print()
-
-    # 音素の分類
-    vowels = {"a", "i", "u", "e", "o"}
-    voiceless_vowels = {"A", "I", "U", "E", "O"}
-    special = {"N", "cl"}
-
-    voiced_vowel_count = 0
-    voiceless_vowel_count = 0
-    consonant_count = 0
-    special_count = 0
-
-    print("音素の内訳:")
-    for phoneme in phoneme_list:
-        if phoneme in vowels:
-            voiced_vowel_count += 1
-            print(f"  {phoneme:5} - 有声母音")
-        elif phoneme in voiceless_vowels:
-            voiceless_vowel_count += 1
-            print(f"  {phoneme:5} - 無声母音")
-        elif phoneme in special:
-            special_count += 1
-            print(f"  {phoneme:5} - 特殊音素")
-        else:
-            consonant_count += 1
-            print(f"  {phoneme:5} - 子音")
-
-    print()
-    print("集計:")
-    print(f"  有声母音: {voiced_vowel_count}")
-    print(f"  無声母音: {voiceless_vowel_count}")
-    print(f"  子音: {consonant_count}")
-    print(f"  特殊音素: {special_count}")
-
-
 def show_examples() -> None:
     """いくつかの例を表示する"""
     print("=" * 70)
@@ -411,11 +356,6 @@ def main():
         help="変換する日本語テキスト",
     )
     parser.add_argument(
-        "--analyze",
-        action="store_true",
-        help="音素の詳細分析を表示する",
-    )
-    parser.add_argument(
         "--examples",
         action="store_true",
         help="いくつかの例を表示する",
@@ -430,8 +370,19 @@ def main():
         action="store_true",
         help="マッピングのデバッグ情報を表示",
     )
+    parser.add_argument(
+        "--all",
+        action="store_true",
+        help="すべての分析モードを実行（examplesとdebug）",
+    )
 
     args = parser.parse_args()
+
+    if args.all:
+        show_examples()
+        print("\n")
+        show_mapping_debug()
+        return
 
     if args.debug:
         show_mapping_debug()
@@ -442,9 +393,7 @@ def main():
         return
 
     if args.text:
-        if args.analyze:
-            analyze_text(args.text)
-        elif args.phoneme_only:
+        if args.phoneme_only:
             result = text_to_phoneme_labels(args.text)
             print(result)
         else:
@@ -471,7 +420,7 @@ def main():
                 ipa = phoneme_labels_to_ipa(phonemes)
                 print(f"IPA: {ipa}")
     else:
-        if not args.examples and not args.debug:
+        if not args.examples and not args.debug and not args.all:
             parser.print_help()
 
 
