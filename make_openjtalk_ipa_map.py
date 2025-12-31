@@ -5,6 +5,7 @@ mora_mapping.pyとjpn-Kana.csvから、OpenJTalk音素ラベル→IPAの変換�
 - mora_mapping.pyの_mora_list_minimumを使用（_mora_list_additionalは無視）
 - jpn-Kana.csvからカタカナ→IPAの対応を取得
 - 無声母音バージョン（A, I, U, E, O）も生成
+- jpn-Kana.csvに存在しない音素（ヴァ行、リェ、ミェ、ピェ、ビェ、デョ、デャ、デェ、テョ、テャ、テェ、グォ、グェ等）は既存パターンから類推して追加
 """
 
 import csv
@@ -106,7 +107,7 @@ def main():
     # ヴァ行をv系IPAに上書き（jpn-Kana.csvではb系になっているため）
     v_overrides = {
         "va": "va",
-        "vA": "v" + "a\u0325",  # 無声化
+        "vA": "v" + "a\u0325",
         "vi": "vi",
         "vI": "v" + "i\u0325",
         "vu": "vɯ",
@@ -117,6 +118,44 @@ def main():
         "vO": "v" + "o\u0325",
     }
     openjtalk_to_ipa.update(v_overrides)
+
+    # mora_mapping.pyには存在するがjpn-Kana.csvには存在しない特殊音素を追加
+    additional_mappings = {
+        "rye": "ɾʲe",
+        "ryE": "ɾʲe\u0325",
+        "mye": "mʲe",
+        "myE": "mʲe\u0325",
+        "pye": "pʲe",
+        "pyE": "pʲe\u0325",
+        "bye": "bʲe",
+        "byE": "bʲe\u0325",
+        "dyo": "dʲo",
+        "dyO": "dʲo\u0325",
+        "dya": "dʲa",
+        "dyA": "dʲa\u0325",
+        "dye": "dʲe",
+        "dyE": "dʲe\u0325",
+        "tyo": "tʲo",
+        "tyO": "tʲo\u0325",
+        "tya": "tʲa",
+        "tyA": "tʲa\u0325",
+        "tye": "tʲe",
+        "tyE": "tʲe\u0325",
+        "gwo": "ɡɰo",
+        "gwO": "ɡɰo\u0325",
+        "gwe": "ɡɰe",
+        "gwE": "ɡɰe\u0325",
+    }
+    openjtalk_to_ipa.update(additional_mappings)
+
+    # jpn-Kana.csvのty/dy系をtʲ/dʲに修正（tjɯ→tʲɯ, djɯ→dʲɯ）
+    ty_dy_corrections = {
+        "tyu": "tʲɯ",
+        "tyU": "tʲɯ\u0325",
+        "dyu": "dʲɯ",
+        "dyU": "dʲɯ\u0325",
+    }
+    openjtalk_to_ipa.update(ty_dy_corrections)
 
     # CSVに出力
     with open(output_csv_path, "w", encoding="utf-8", newline="") as f:
