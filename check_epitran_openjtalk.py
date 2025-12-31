@@ -19,10 +19,12 @@ import os
 import unicodedata
 from collections import defaultdict
 
+import panphon
 import pyopenjtalk
 import regex
 from epitran.rules import Rules
 from epitran.simple import SimpleEpitran
+from epitran.xsampa import XSampa
 
 # =============================================================================
 # OpenJTalk音素ラベル用Epitranクラス
@@ -153,6 +155,12 @@ _POST_FILE = os.path.join(_BASE_DIR, "hiho_data", "openjtalk_postprocess.txt")
 
 # グローバルインスタンス（遅延初期化）
 _epitran_instance: OpenJTalkLabelEpitran | None = None
+
+# panphonのFeatureTable（特徴量ベクトル取得用）
+_FT = panphon.FeatureTable()
+
+# XSampaインスタンス（IPA→X-SAMPA変換用）
+_XS = XSampa()
 
 
 def _get_epitran() -> OpenJTalkLabelEpitran:
@@ -346,6 +354,102 @@ def show_mapping_debug() -> None:
             print(f"  {label} → {epi.g2p[label][0]}")
 
 
+def analyze_text_detail(text: str) -> None:
+    """
+    単一テキストのIPA変換結果について特徴量ベクトルを含む詳細分析を表示
+
+    Args:
+        text: 日本語テキスト
+    """
+    print(f"【{text}】の詳細分析")
+    print("-" * 70)
+
+    # 音素ラベル列を取得
+    phoneme_str = text_to_phoneme_labels(text)
+    phoneme_list = text_to_phoneme_list(text)
+
+    print(f"テキスト:     {text}")
+    print(f"OpenJTalk:    {phoneme_str}")
+
+    # IPA変換
+    ipa = phoneme_labels_to_ipa(phoneme_str)
+    print(f"IPA:          {ipa}")
+
+    # X-SAMPA変換
+    xsampa = _XS.ipa2xs(ipa)
+    print(f"X-SAMPA:      {xsampa}")
+    print()
+
+    # 各音素の詳細
+    print("音素ラベル別の詳細:")
+    print(f"  {'Label':<8} {'IPA':<12} {'X-SAMPA':<12} {'特徴量'}")
+    print("  " + "-" * 66)
+
+    epi = _get_epitran()
+    for label in phoneme_list:
+        if label == "pau":
+            print(f"  {label:<8} (ポーズ)")
+            continue
+
+        # 個別にIPA変換
+        ipa_single = epi.transliterate(label)
+
+        # X-SAMPA変換
+        xsampa_single = _XS.ipa2xs(ipa_single) if ipa_single else ""
+
+        # 特徴量ベクトル取得
+        seg_objs = _FT.word_fts(ipa_single)
+        if seg_objs and len(seg_objs) > 0:
+            # 最初のセグメントの特徴量を取得
+            vec = seg_objs[0].numeric()
+            vec_str = f"{vec}" if vec else "N/A"
+        else:
+            vec_str = "N/A"
+
+        print(f"  {label:<8} {ipa_single:<12} {xsampa_single:<12} {vec_str}")
+
+    print()
+
+    # IPA全体のセグメント分析
+    print("IPA全体のセグメント分析:")
+    seg_objs = _FT.word_fts(ipa)
+    ipa_segs = _FT.ipa_segs(ipa)
+
+    if seg_objs and ipa_segs:
+        print(f"  セグメント数: {len(seg_objs)}")
+        print(f"  {'IPA':<10} {'X-SAMPA':<12} {'特徴量ベクトル'}")
+        print("  " + "-" * 66)
+
+        for seg_str, seg_obj in zip(ipa_segs, seg_objs):
+            seg_xsampa = _XS.ipa2xs(seg_str)
+            vec = seg_obj.numeric()
+            print(f"  {seg_str:<10} {seg_xsampa:<12} {vec}")
+    else:
+        print("  セグメント情報なし")
+
+    print()
+
+
+def show_detail_analysis() -> None:
+    """
+    サンプルテキストのIPA変換結果について特徴量ベクトルを含む詳細分析を表示
+    """
+    print("=" * 70)
+    print("詳細分析（特徴量ベクトル含む）")
+    print("=" * 70)
+    print()
+
+    examples = [
+        "こんにちは",
+        "きつね",
+        "サッカー",
+    ]
+
+    for text in examples:
+        analyze_text_detail(text)
+        print()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="日本語テキストからOpenJTalk音素ラベル列・IPA音声記号列への変換"
@@ -371,27 +475,84 @@ def main():
         help="マッピングのデバッグ情報を表示",
     )
     parser.add_argument(
+        "--detail",
+        action="store_true",
+        help="特徴量ベクトルを含む詳細分析を表示",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
-        help="すべての分析モードを実行（examplesとdebug）",
+        help="すべての分析モードを実行（examples、debug、detail）",
     )
 
     args = parser.parse_args()
 
+    # デフォルトのサンプルテキスト
+    default_texts = [
+        "こんにちは",
+        "おはようございます",
+        "きつね",
+    ]
+
+    # テキストが指定されていない場合はデフォルトを使用
+    texts = [args.text] if args.text else default_texts
+
+    # --allオプション：全ての分析モードを実行
     if args.all:
-        show_examples()
-        print("\n")
-        show_mapping_debug()
+        for text in texts:
+            print("=" * 70)
+            print(f"【{text}】の全分析")
+            print("=" * 70)
+            print()
+
+            # 基本的な変換結果
+            phonemes = text_to_phoneme_labels(text)
+            ipa = phoneme_labels_to_ipa(phonemes)
+            xsampa = _XS.ipa2xs(ipa)
+            print(f"テキスト:     {text}")
+            print(f"OpenJTalk:    {phonemes}")
+            print(f"IPA:          {ipa}")
+            print(f"X-SAMPA:      {xsampa}")
+            print()
+
+            # マッピングデバッグ情報（最初の1回のみ）
+            if text == texts[0]:
+                print("-" * 70)
+                print("マッピング情報:")
+                print("-" * 70)
+                epi = _get_epitran()
+                print(f"マッピングファイル: {_MAP_FILE}")
+                print(f"ポストプロセッサファイル: {_POST_FILE}")
+                print(f"postproc有効: {epi.postproc}")
+                print()
+
+            # 詳細分析
+            print("-" * 70)
+            print("詳細分析:")
+            print("-" * 70)
+            analyze_text_detail(text)
+            print()
         return
 
+    # --debugオプション：マッピングデバッグ情報のみ
     if args.debug:
         show_mapping_debug()
         return
 
+    # --examplesオプション：サンプル例のみ
     if args.examples:
         show_examples()
         return
 
+    # --detailオプション：詳細分析のみ（デフォルトサンプルまたは指定テキスト）
+    if args.detail:
+        if args.text:
+            analyze_text_detail(args.text)
+        else:
+            show_detail_analysis()
+        return
+
+    # テキスト引数が指定されている場合
     if args.text:
         if args.phoneme_only:
             result = text_to_phoneme_labels(args.text)
@@ -420,7 +581,7 @@ def main():
                 ipa = phoneme_labels_to_ipa(phonemes)
                 print(f"IPA: {ipa}")
     else:
-        if not args.examples and not args.debug and not args.all:
+        if not args.examples and not args.debug and not args.detail and not args.all:
             parser.print_help()
 
 
