@@ -116,6 +116,7 @@ class OpenJTalkLabelEpitran(SimpleEpitran):
                 text = text[len(source) :]
             else:
                 tr_list.append((text[0], False))
+                self.nils[text[0]] += 1
                 text = text[1:]
 
         text = "".join([s for (s, _) in filter(filter_func, tr_list)])
@@ -132,6 +133,28 @@ class OpenJTalkLabelEpitran(SimpleEpitran):
             text = self.puncnorm.norm(text)
 
         return unicodedata.normalize("NFC", text)
+
+    def transliterate(
+        self, text: str, normpunc: bool = False, ligatures: bool = False
+    ) -> str:
+        """
+        音素ラベル列をIPAに変換（未知文字の検証付き）
+        """
+        self.nils.clear()
+        result = super().transliterate(text, normpunc=normpunc, ligatures=ligatures)
+        unknown_chars = {
+            char: count for char, count in self.nils.items() if char not in (" ",)
+        }
+        if unknown_chars:
+            char_list = ", ".join(
+                f"'{char}' ({count}回)" for char, count in unknown_chars.items()
+            )
+            raise ValueError(
+                f"Unknown phoneme label(s) detected: {char_list}\n"
+                f"Input: {text}\n"
+                f"Mapping file: {self._custom_map_file}"
+            )
+        return result
 
 
 class _CustomProcessor:
