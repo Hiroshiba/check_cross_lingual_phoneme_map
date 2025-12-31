@@ -367,6 +367,47 @@ def show_examples() -> None:
     print("  - 撥音は環境により変化（ɴ, m, n, ŋ等）")
 
 
+def _validate_phoneme_feature_length(phoneme_str: str, ipa: str) -> None:
+    """
+    音素数とpanphon特徴量列の長さが一致するか検証する
+
+    Args:
+        phoneme_str: スペース区切りの音素ラベル列
+        ipa: IPA音声記号列（スペース区切りの場合がある）
+
+    Raises:
+        ValueError: 音素数と特徴量の長さが一致しない場合
+    """
+    segments = split_by_silence_markers(phoneme_str)
+
+    ipa_segments = ipa.split(" ") if " " in ipa else [ipa]
+
+    if len(segments) != len(ipa_segments):
+        raise ValueError(
+            f"Number of segments mismatch: "
+            f"phoneme segments={len(segments)}, IPA segments={len(ipa_segments)}\n"
+            f"Phoneme: {phoneme_str}\n"
+            f"IPA: {ipa}"
+        )
+
+    for i, (phoneme_seg, ipa_seg) in enumerate(zip(segments, ipa_segments)):
+        phoneme_labels = phoneme_seg.split()
+        phoneme_count = len([p for p in phoneme_labels if p not in ("pau", "sil")])
+
+        seg_objs = _FT.word_fts(ipa_seg)
+        feature_count = len(seg_objs)
+
+        if phoneme_count != feature_count:
+            raise ValueError(
+                f"Length mismatch in segment {i + 1}: "
+                f"phoneme_count={phoneme_count}, feature_count={feature_count}\n"
+                f"Phoneme segment: {phoneme_seg}\n"
+                f"IPA segment: {ipa_seg}\n"
+                f"Phoneme labels: {phoneme_labels}\n"
+                f"Feature segments: {_FT.ipa_segs(ipa_seg)}"
+            )
+
+
 def show_mapping_debug() -> None:
     """マッピングの詳細デバッグ情報を表示"""
     print("=" * 70)
@@ -425,6 +466,9 @@ def analyze_phoneme_labels_detail(
     xsampa = _XS.ipa2xs(ipa)
     print(f"X-SAMPA:      {xsampa}")
     print()
+
+    # 音素数と特徴量の長さ検証
+    _validate_phoneme_feature_length(phoneme_str, ipa)
 
     # IPA全体のセグメント分析
     print("IPAセグメント分析:")
