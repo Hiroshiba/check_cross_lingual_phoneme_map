@@ -171,6 +171,31 @@ def _get_epitran() -> OpenJTalkLabelEpitran:
     return _epitran_instance
 
 
+def read_lab_file(lab_file: str) -> str:
+    """
+    labファイルから音素ラベル列を読み込む
+
+    Args:
+        lab_file: labファイルのパス
+
+    Returns:
+        スペース区切りの音素ラベル列
+    """
+    from pathlib import Path
+
+    labels = []
+    with Path(lab_file).open(encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) >= 3:
+                label = parts[2]
+                labels.append(label)
+    return " ".join(labels)
+
+
 def text_to_phoneme_labels(text: str) -> str:
     """
     日本語テキストをOpenJTalk音素ラベル列に変換する
@@ -202,17 +227,17 @@ def phoneme_labels_to_ipa(phoneme_labels: str) -> str:
     """
     OpenJTalk音素ラベル列をIPA音声記号列に変換する
 
-    pauラベルがある場合は、pauで分割して各部分を変換し、
+    pauまたはsilラベルがある場合は、それらで分割して各部分を変換し、
     スペースで結合して返す。
 
     Args:
         phoneme_labels: スペース区切りの音素ラベル列
 
     Returns:
-        IPA音声記号列（pauがあった場合はスペース区切り）
+        IPA音声記号列（pauまたはsilがあった場合はスペース区切り）
     """
-    # pauで分割
-    segments = split_by_pau(phoneme_labels)
+    # pauまたはsilで分割
+    segments = split_by_silence_markers(phoneme_labels)
 
     # 各セグメントを変換
     epi = _get_epitran()
@@ -227,22 +252,22 @@ def phoneme_labels_to_ipa(phoneme_labels: str) -> str:
     return " ".join(ipa_segments)
 
 
-def split_by_pau(phoneme_labels: str) -> list[str]:
+def split_by_silence_markers(phoneme_labels: str) -> list[str]:
     """
-    音素ラベル列をpauで分割する
+    音素ラベル列をpauまたはsilで分割する
 
     Args:
         phoneme_labels: スペース区切りの音素ラベル列
 
     Returns:
-        pauで分割されたセグメントのリスト
+        pauまたはsilで分割されたセグメントのリスト
     """
     phonemes = phoneme_labels.split(" ")
     segments = []
     current_segment = []
 
     for phoneme in phonemes:
-        if phoneme == "pau":
+        if phoneme == "pau" or phoneme == "sil":
             if current_segment:
                 segments.append(" ".join(current_segment))
                 current_segment = []
@@ -354,21 +379,19 @@ def show_mapping_debug() -> None:
             print(f"  {label} → {epi.g2p[label][0]}")
 
 
-def analyze_text_detail(text: str) -> None:
+def analyze_phoneme_labels_detail(
+    phoneme_str: str, source_label: str = "音素ラベル"
+) -> None:
     """
-    単一テキストのIPA変換結果について特徴量ベクトルを含む詳細分析を表示
+    音素ラベル列のIPA変換結果について特徴量ベクトルを含む詳細分析を表示
 
     Args:
-        text: 日本語テキスト
+        phoneme_str: スペース区切りの音素ラベル列
+        source_label: 入力ソースのラベル（"テキスト"や"labファイル"など）
     """
-    print(f"【{text}】の詳細分析")
+    print(f"【{source_label}】の詳細分析")
     print("-" * 70)
 
-    # 音素ラベル列を取得
-    phoneme_str = text_to_phoneme_labels(text)
-    phoneme_list = text_to_phoneme_list(text)
-
-    print(f"テキスト:     {text}")
     print(f"OpenJTalk:    {phoneme_str}")
 
     # IPA変換
@@ -380,38 +403,8 @@ def analyze_text_detail(text: str) -> None:
     print(f"X-SAMPA:      {xsampa}")
     print()
 
-    # 各音素の詳細
-    print("音素ラベル別の詳細:")
-    print(f"  {'Label':<8} {'IPA':<12} {'X-SAMPA':<12} {'特徴量'}")
-    print("  " + "-" * 66)
-
-    epi = _get_epitran()
-    for label in phoneme_list:
-        if label == "pau":
-            print(f"  {label:<8} (ポーズ)")
-            continue
-
-        # 個別にIPA変換
-        ipa_single = epi.transliterate(label)
-
-        # X-SAMPA変換
-        xsampa_single = _XS.ipa2xs(ipa_single) if ipa_single else ""
-
-        # 特徴量ベクトル取得
-        seg_objs = _FT.word_fts(ipa_single)
-        if seg_objs and len(seg_objs) > 0:
-            # 最初のセグメントの特徴量を取得
-            vec = seg_objs[0].numeric()
-            vec_str = f"{vec}" if vec else "N/A"
-        else:
-            vec_str = "N/A"
-
-        print(f"  {label:<8} {ipa_single:<12} {xsampa_single:<12} {vec_str}")
-
-    print()
-
     # IPA全体のセグメント分析
-    print("IPA全体のセグメント分析:")
+    print("IPAセグメント分析:")
     seg_objs = _FT.word_fts(ipa)
     ipa_segs = _FT.ipa_segs(ipa)
 
@@ -428,6 +421,17 @@ def analyze_text_detail(text: str) -> None:
         print("  セグメント情報なし")
 
     print()
+
+
+def analyze_text_detail(text: str) -> None:
+    """
+    単一テキストのIPA変換結果について特徴量ベクトルを含む詳細分析を表示
+
+    Args:
+        text: 日本語テキスト
+    """
+    phoneme_str = text_to_phoneme_labels(text)
+    analyze_phoneme_labels_detail(phoneme_str, source_label=text)
 
 
 def show_detail_analysis() -> None:
@@ -484,8 +488,57 @@ def main():
         action="store_true",
         help="すべての分析モードを実行（examples、debug、detail）",
     )
+    parser.add_argument(
+        "--lab",
+        type=str,
+        help="音素ラベルを読み込むlabファイルのパス",
+    )
 
     args = parser.parse_args()
+
+    # textとlabは排他的
+    if args.text and args.lab:
+        parser.error("textとlabは同時に指定できません")
+
+    # labファイルが指定された場合
+    if args.lab:
+        if not args.detail and not args.all:
+            parser.error("--labオプションは--detailまたは--allと併用してください")
+
+        phoneme_str = read_lab_file(args.lab)
+        source_label = args.lab
+
+        if args.all:
+            print("=" * 70)
+            print(f"【{source_label}】の全分析")
+            print("=" * 70)
+            print()
+
+            ipa = phoneme_labels_to_ipa(phoneme_str)
+            xsampa = _XS.ipa2xs(ipa)
+            print(f"labファイル:  {source_label}")
+            print(f"OpenJTalk:    {phoneme_str}")
+            print(f"IPA:          {ipa}")
+            print(f"X-SAMPA:      {xsampa}")
+            print()
+
+            print("-" * 70)
+            print("マッピング情報:")
+            print("-" * 70)
+            epi = _get_epitran()
+            print(f"マッピングファイル: {_MAP_FILE}")
+            print(f"ポストプロセッサファイル: {_POST_FILE}")
+            print(f"postproc有効: {epi.postproc}")
+            print()
+
+            print("-" * 70)
+            print("詳細分析:")
+            print("-" * 70)
+            analyze_phoneme_labels_detail(phoneme_str, source_label=source_label)
+            print()
+        elif args.detail:
+            analyze_phoneme_labels_detail(phoneme_str, source_label=source_label)
+        return
 
     # デフォルトのサンプルテキスト
     default_texts = [
@@ -562,8 +615,8 @@ def main():
             print(f"テキスト: {args.text}")
             print(f"OpenJTalk: {phonemes}")
 
-            # pauで分割して表示
-            segments = split_by_pau(phonemes)
+            # pauまたはsilで分割して表示
+            segments = split_by_silence_markers(phonemes)
             if len(segments) > 1:
                 print()
                 print(f"pauで分割されたセグメント数: {len(segments)}")
