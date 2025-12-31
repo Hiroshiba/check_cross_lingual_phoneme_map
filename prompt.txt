@@ -92,6 +92,8 @@ jpn-Kanaのpostprocess用csvを読み込んで、openjtalkラベル用に変え�
 
 `check_epitran_openjtalk.py`の機能を修正していきます。
 後処理に`hiho_data/openjtalk_postprocess.txt`を使うように修正してください。
+また、check_epitran_jpn.pyやcheck_eitango.pyと同じように、`--all`オプションを指定したときに色々な情報が表示されるようにしてください。
+この２つのpyにない機能で、かつ目的を達成するために不要そうな表示機能は削除してください。
 `reports/2025-12-30 openjtalk音素ラベルからIPAへの変換.md`を読んで参考にしてください。
 
 まずは言われたところまででお願いします。
